@@ -1,0 +1,17 @@
+{
+  "name": "lru-map",
+  "version": "1.0.0",
+  "description": "LRU cache based on ES6 Map",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "Assaf Arkin",
+  "license": "MIT",
+  "devDependencies": {
+    "mocha": "^2.2.5"
+  },
+  "dependencies": {
+    "lodash": "^3.10.0"
+  }
+}
