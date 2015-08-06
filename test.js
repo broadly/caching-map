@@ -648,3 +648,78 @@ describe('Clone map', function() {
 
 });
 
+
+describe('Read-through get', function() {
+
+  const lru = new LRU();
+
+  describe('able to resolve', function() {
+
+    let promise;
+
+    before(function() {
+      promise = lru.get('x', function() {
+        return 'XXX';
+      });
+    });
+
+    it('should resolve to read-through value', function(done) {
+      promise
+        .then(function(value) {
+          assert.equal(value, 'XXX');
+          done();
+        })
+        .catch(done);
+    });
+
+    describe('key', function() {
+
+      it('should exist', function() {
+        assert.equal( lru.has('x'), true);
+      });
+
+      it('should resolve to same value', function(done) {
+        lru.get('x')
+        .then(function(value) {
+          assert.equal(value, 'XXX');
+          done();
+        })
+        .catch(done);
+      });
+
+    });
+
+  });
+
+  describe('unable to resolve', function() {
+
+    let promise;
+
+    before(function() {
+      promise = lru.get('y', function() {
+        throw new Error('fail');
+      });
+    });
+
+    it('should reject read-through', function(done) {
+      promise
+        .then(function() {
+          done(new Error('Not expected to arrive here'));
+        })
+        .catch(function() {
+          done();
+        });
+    });
+
+    describe('key', function() {
+
+      it('should not exist', function() {
+        assert.equal( lru.has('y'), false);
+        assert.equal( lru.get('y'), undefined);
+      });
+
+    });
+
+  });
+
+});

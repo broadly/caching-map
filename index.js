@@ -158,15 +158,19 @@ class LRU {
 
 
   // Returns the key value if set and not evicted yet.
-  get(key) {
+  //
+  // If the key is not in the cache, and the second argument is a callback,
+  // this will create a promise that resolves to the value returned by the
+  // callback, set the key to that promise and return the promise.
+  get(key, callback) {
     const link = this[_map].get(key);
     if (!link)
-      return undefined;
+      return this._readThrough(key, callback);
 
     // Although we do have the value, the contract is that we don't return
     // expired values
     if (hasExpired(link))
-      return undefined;
+      return this._readThrough(key, callback);
 
     // Link becomes most recently used
     const mostRecent = (this[_head] === link);
@@ -179,6 +183,26 @@ class LRU {
       this._prependToList(link);
     }
     return link.value;
+  }
+
+
+  // If the key doesn't exist, get() calls this to implement read through.
+  _readThrough(key, callback) {
+    if (typeof callback === 'function') {
+      const self    = this;
+      const promise = Promise.resolve().then(callback);
+
+      this.set(key, promise);
+      promise
+        .catch(function() {
+          const entry = self[_map].get(key);
+          if (entry && entry.value === promise)
+            self.delete(key);
+        });
+
+      return promise;
+    } else
+      return undefined;
   }
 
 
