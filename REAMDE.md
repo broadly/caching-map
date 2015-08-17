@@ -1,4 +1,4 @@
-# LRU cache based on ES6 Map
+# LRU cache for ES6
 
 An [LRU cache](http://www.cs.uml.edu/~jlu1/doc/codes/lruCache.html) that
 implements the same interface as [ES6
@@ -54,6 +54,10 @@ two.set('b', {});
 two.set('c', {});
 two.keys();
 => [ 'b', 'c' ]
+two.size
+=> 2
+two.cost
+=> 2
 
 
 // This cache will only hold keys with a total cost of 10, dropping least
@@ -73,11 +77,17 @@ ten.get('b');
 ten.set('d', '', { cost: 4 });
 ten.keys();
 => [ 'b', 'd' ]
+ten.size
+=> 2
+ten.cost
+=> 8
 
 // This key is too big to hold
 ten.set('too-big', '', { cost: 11 });
 ten.keys();
 => [ 'b', 'd' ]
+ten.cost
+=> 8
 
 
 // An easy way to disable caching, e.g. in development mode

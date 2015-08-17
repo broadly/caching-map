@@ -21,6 +21,14 @@ describe('LRU with limit of zero', function() {
     assert.equal(lru.limit, 0);
   });
 
+  it('should report a cost of zero', function() {
+    assert.equal(lru.cost, 0);
+  });
+
+  it('should report a size of zero', function() {
+    assert.equal(lru.size, 0);
+  });
+
 
   describe('after setting two keys', function() {
 
@@ -32,6 +40,10 @@ describe('LRU with limit of zero', function() {
 
     it('should have a size of zero', function() {
       assert.equal(lru.size, 0);
+    });
+
+    it('should report a cost of zero', function() {
+      assert.equal(lru.cost, 0);
     });
 
     it('should have neither of these keys', function() {
@@ -55,6 +67,14 @@ describe('LRU with negative limit', function() {
     assert.equal(lru.limit, 0);
   });
 
+  it('should report a cost of zero', function() {
+    assert.equal(lru.cost, 0);
+  });
+
+  it('should report a size of zero', function() {
+    assert.equal(lru.size, 0);
+  });
+
 });
 
 
@@ -71,6 +91,10 @@ describe('LRU with three keys', function() {
 
   it('should have a size of three', function() {
     assert.equal(lru.size, 3);
+  });
+
+  it('should have a cost of three', function() {
+    assert.equal(lru.cost, 3);
   });
 
 
@@ -190,8 +214,12 @@ describe('LRU with three keys', function() {
        .set('z', '<z>');
     });
 
-    it('should not change map size', function() {
+    it('should not change size', function() {
       assert.equal(lru.size, 3);
+    });
+
+    it('should not change cost', function() {
+      assert.equal(lru.cost, 3);
     });
 
     it('should make last change the most recent entry', function() {
@@ -218,8 +246,12 @@ describe('LRU with three keys', function() {
         assert.equal(returnValue, false);
       });
 
-      it('should not change map size', function() {
+      it('should not change size', function() {
         assert.equal(lru.size, 3);
+      });
+
+      it('should not change cost', function() {
+        assert.equal(lru.cost, 3);
       });
 
       it('should keep all the same keys', function() {
@@ -244,8 +276,12 @@ describe('LRU with three keys', function() {
         assert.equal(returnValue, true);
       });
 
-      it('should change map size', function() {
+      it('should change size', function() {
         assert.equal(lru.size, 2);
+      });
+
+      it('should change cost', function() {
+        assert.equal(lru.cost, 2);
       });
 
       it('should not return key when iterating', function() {
@@ -269,8 +305,12 @@ describe('LRU with three keys', function() {
         lru.clear();
       });
 
-      it('should reset map size', function() {
+      it('should reset size', function() {
         assert.equal(lru.size, 0);
+      });
+
+      it('should reset cost', function() {
+        assert.equal(lru.cost, 0);
       });
 
       it('should have no keys', function() {
@@ -325,8 +365,12 @@ describe('LRU with limit of five', function() {
       lru.set('g', 7);
     });
 
-    it('should hold 5 keys', function() {
+    it('should have size of 5', function() {
       assert.equal(lru.size, 5);
+    });
+
+    it('should have cost of 5', function() {
+      assert.equal(lru.cost, 5);
     });
 
     it('should not have first key', function() {
@@ -358,8 +402,12 @@ describe('LRU with limit of five', function() {
         lru.set('h', 8, { cost: 3 });
       });
 
-      it('should hold 3 keys', function() {
+      it('should have size of 3', function() {
         assert.equal(lru.size, 3);
+      });
+
+      it('should still have cost of 5', function() {
+        assert.equal(lru.cost, 5);
       });
 
       it('should drop two oldest keys', function() {
@@ -379,8 +427,12 @@ describe('LRU with limit of five', function() {
           lru.set('i', 9, { cost: 8 });
         });
 
-        it('should hold 3 keys', function() {
+        it('should have size of 3', function() {
           assert.equal(lru.size, 3);
+        });
+
+        it('should still have cost of 5', function() {
+          assert.equal(lru.cost, 5);
         });
 
         it('should not add new key', function() {
@@ -400,8 +452,12 @@ describe('LRU with limit of five', function() {
           lru.set('j', 10, { cost: 3 });
         });
 
-        it('should hold one key', function() {
+        it('should have size 1', function() {
           assert.equal(lru.size, 1);
+        });
+
+        it('should drop cost to 3', function() {
+          assert.equal(lru.cost, 3);
         });
 
         it('should add new key', function() {
@@ -439,11 +495,15 @@ describe('LRU with no limit', function() {
         .set('y', 'YYY', { cost: Number.MAX_SAFE_INTEGER });
     });
 
-    it('should have a size of two', function() {
+    it('should have size of two', function() {
       assert.equal(lru.size, 2);
     });
 
-    it('should retain both keys', function() {
+    it('should have cost double large', function() {
+      assert.equal(lru.cost, Number.MAX_SAFE_INTEGER * 2);
+    });
+
+    it('should still have both keys', function() {
       assert.equal(lru.get('x'), 'XXX');
       assert.equal(lru.get('y'), 'YYY');
     });
@@ -477,7 +537,16 @@ describe('Iterate and delete', function() {
   });
 
   it('should delete all keys', function() {
+    const nextKey = lru.keys().next();
+    assert( !nextKey.value && nextKey.done );
+  });
+
+  it('should have size 0', function() {
     assert.equal(lru.size, 0);
+  });
+
+  it('should have cost 0', function() {
+    assert.equal(lru.cost, 0);
   });
 
 });
@@ -577,8 +646,12 @@ describe('LRU with expiring entries', function() {
         .set('g', 7, { ttl: 0 });
     });
 
-    it('should have a size of four', function() {
+    it('should have a size 4', function() {
       assert.equal(lru.size, 4);
+    });
+
+    it('should have a cost 4', function() {
+      assert.equal(lru.cost, 4);
     });
 
     it('should keep unexpired keys', function() {
@@ -620,6 +693,14 @@ describe('Clone map', function() {
     assert.deepEqual(values, [ 2, 1 ]);
   });
 
+  it('should have same size as the source', function() {
+    assert.equal(fromMap.size, 2);
+  });
+
+  it('should have same cost as the source', function() {
+    assert.equal(fromMap.cost, 2);
+  });
+
 
   describe('Clone cache', function() {
 
@@ -639,9 +720,12 @@ describe('Clone map', function() {
       assert.deepEqual(values, [ 2, 1 ]);
     });
 
-    it('should have the same cost as the source', function() {
-      fromCache.set('c');
+    it('should have same size as the source', function() {
       assert.equal(fromCache.size, 2);
+    });
+
+    it('should have same cost as the source', function() {
+      assert.equal(fromCache.cost, 2);
     });
 
   });

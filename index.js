@@ -106,6 +106,11 @@ class LRU {
     this[_limit] = actualLimit(value);
   }
 
+  // Returns the current cost
+  get cost() {
+    return this[_cost];
+  }
+
   get size() {
     return this[_map].size;
   }
