@@ -783,6 +783,7 @@ describe('With materialize function', function() {
     let rejected;
 
     before(function() {
+      lru.clear();
       lru.materialize = function() {
         throw new Error('fail');
       };
@@ -797,16 +798,61 @@ describe('With materialize function', function() {
       });
     });
 
-    it('should still have size of 1', function() {
-      assert.equal( lru.size, 1 );
+    it('should still have size of 0', function() {
+      assert.equal( lru.size, 0 );
     });
 
-    it('should still have cost of 1', function() {
-      assert.equal( lru.size, 1 );
+    it('should still have cost of 0', function() {
+      assert.equal( lru.size, 0 );
     });
 
     it('should not have new key', function() {
       assert.equal( lru.has('y'), false);
+    });
+
+  });
+
+
+  describe('materialize and set', function() {
+
+    let promise;
+
+    before(function() {
+      lru.clear();
+      lru.materialize = function(key) {
+        const lazy = Promise.resolve('ZZZ');
+        lazy.then(function() {
+          lru.set(key, lazy, { cost: 5 });
+        });
+        return lazy;
+      };
+      promise = lru.get('z');
+    });
+
+    it('should retrieve returned value', function() {
+      return promise
+        .then(function(value) {
+          assert.equal(value, 'ZZZ');
+        });
+    });
+
+    it('should have size of 1', function() {
+      assert.equal( lru.size, 1 );
+    });
+
+    it('should have cost of 5', function() {
+      assert.equal( lru.cost, 5 );
+    });
+
+    it('should have key', function() {
+      assert( lru.get('z') );
+    });
+
+    it('should keep returning value', function() {
+      return lru.get('z')
+        .then(function(value) {
+          assert.equal(value, 'ZZZ');
+        });
     });
 
   });

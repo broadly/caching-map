@@ -167,6 +167,22 @@ lru.get(URL).then(
 
 ```
 
+If you want to also set the cost or TTL for that key:
+
+```js
+lru.materialize = function(url) {
+  const promise = promisify(request)(url);
+
+  promise.then(function(response) {
+
+    const cost = response.body.length;
+    lru.set(url, promise, { cost });
+
+  });
+  return promise;
+};
+```
+
 
 ### Iterate
 
