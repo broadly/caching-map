@@ -137,7 +137,7 @@ the future, `Map` may gain additional methods and properties, and these may be
 `limit` property, the `recent` iterator, and a 3rd argument to the `set` method.
 These are the minimum additions required for a working implementation.
 
-The `size` property is read-only so uses a getter.  The `limit` property is
+The `size` and `cost` properties are read-only.  The `limit` property is
 read/write, but we can't accept invalid values (e.g. `null` and "foo" don't make
 sense), so we use getter/setter to clean those up.
 

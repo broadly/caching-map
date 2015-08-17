@@ -163,20 +163,21 @@ class LRU {
 
 
   // Returns the key value if set and not evicted yet.
-  //
-  // If the key is not in the cache, and the second argument is a callback,
-  // this will create a promise that resolves to the value returned by the
-  // callback, set the key to that promise and return the promise.
-  get(key, callback) {
+  get(key) {
     const link = this[_map].get(key);
-    if (!link)
-      return this._readThrough(key, callback);
-
     // Although we do have the value, the contract is that we don't return
     // expired values
-    if (hasExpired(link))
-      return this._readThrough(key, callback);
+    if (link && !hasExpired(link)) {
+      this._moveLinkToHead(link);
+      return link.value;
+    } else if (this.materialize)
+      return this._materializeAndCache(key);
+    else
+      return undefined;
+  }
 
+
+  _moveLinkToHead(link) {
     // Link becomes most recently used
     const mostRecent = (this[_head] === link);
     if (!mostRecent) {
@@ -187,27 +188,22 @@ class LRU {
       this._removeFromList(link);
       this._prependToList(link);
     }
-    return link.value;
   }
 
 
-  // If the key doesn't exist, get() calls this to implement read through.
-  _readThrough(key, callback) {
-    if (typeof callback === 'function') {
-      const self    = this;
-      const promise = Promise.resolve().then(callback);
+  _materializeAndCache(key) {
+    const self    = this;
+    const promise = Promise.resolve(key).then(this.materialize);
 
-      this.set(key, promise);
-      promise
-        .catch(function() {
-          const entry = self[_map].get(key);
-          if (entry && entry.value === promise)
-            self.delete(key);
-        });
+    function deleteIfRejected() {
+      const entry = self[_map].get(key);
+      if (entry && entry.value === promise)
+        self.delete(key);
+    }
 
-      return promise;
-    } else
-      return undefined;
+    this.set(key, promise);
+    promise.catch(deleteIfRejected);
+    return promise;
   }
 
 

@@ -300,7 +300,7 @@ describe('LRU with three keys', function() {
     });
 
 
-    describe('clear map', function() {
+    describe('clear cache', function() {
       before(function() {
         lru.clear();
       });
@@ -452,7 +452,7 @@ describe('LRU with limit of five', function() {
           lru.set('j', 10, { cost: 3 });
         });
 
-        it('should have size 1', function() {
+        it('should have size of 1', function() {
           assert.equal(lru.size, 1);
         });
 
@@ -495,7 +495,7 @@ describe('LRU with no limit', function() {
         .set('y', 'YYY', { cost: Number.MAX_SAFE_INTEGER });
     });
 
-    it('should have size of two', function() {
+    it('should have size of 2', function() {
       assert.equal(lru.size, 2);
     });
 
@@ -541,11 +541,11 @@ describe('Iterate and delete', function() {
     assert( !nextKey.value && nextKey.done );
   });
 
-  it('should have size 0', function() {
+  it('should have size of 0', function() {
     assert.equal(lru.size, 0);
   });
 
-  it('should have cost 0', function() {
+  it('should have cost of 0', function() {
     assert.equal(lru.cost, 0);
   });
 
@@ -678,7 +678,7 @@ describe('LRU with expiring entries', function() {
 });
 
 
-describe('Clone map', function() {
+describe('Clone Map', function() {
 
   const map     = new Map([ [ 'a', 1 ], [ 'b', 2 ] ]);
   const fromMap = new LRU(2, map);
@@ -733,75 +733,80 @@ describe('Clone map', function() {
 });
 
 
-describe('Read-through get', function() {
+describe('With materialize function', function() {
 
   const lru = new LRU();
+  let resolved;
 
-  describe('able to resolve', function() {
-
-    let promise;
-
-    before(function() {
-      promise = lru.get('x', function() {
-        return 'XXX';
-      });
-    });
-
-    it('should resolve to read-through value', function(done) {
-      promise
-        .then(function(value) {
-          assert.equal(value, 'XXX');
-          done();
-        })
-        .catch(done);
-    });
-
-    describe('key', function() {
-
-      it('should exist', function() {
-        assert.equal( lru.has('x'), true);
-      });
-
-      it('should resolve to same value', function(done) {
-        lru.get('x')
-        .then(function(value) {
-          assert.equal(value, 'XXX');
-          done();
-        })
-        .catch(done);
-      });
-
-    });
-
+  before(function() {
+    lru.materialize = function(key) {
+      const upper = key.toUpperCase();
+      return `${upper}${upper}${upper}`;
+    };
   });
+
+  before(function() {
+    resolved = lru.get('x');
+    return resolved;
+  });
+
+  it('should resolve to materialized value', function() {
+    return resolved
+      .then(function(value) {
+        assert.equal(value, 'XXX');
+      });
+  });
+
+  it('should have size of 1', function() {
+    assert.equal( lru.size, 1 );
+  });
+
+  it('should have cost of 1', function() {
+    assert.equal( lru.size, 1 );
+  });
+
+  it('should have new key', function() {
+    assert(lru.has('x'));
+  });
+
+
+  describe('get again', function() {
+    it('should return same value', function() {
+      const again = lru.get('x');
+      assert.equal(again, resolved);
+    });
+  });
+
 
   describe('unable to resolve', function() {
 
-    let promise;
+    let rejected;
 
     before(function() {
-      promise = lru.get('y', function() {
+      lru.materialize = function() {
         throw new Error('fail');
+      };
+      rejected = lru.get('y');
+    });
+
+    it('should reject the get', function() {
+      return rejected.then(function() {
+        throw new Error('Not expected to arrive here');
+      }, function() {
+        // Not an error
       });
     });
 
-    it('should reject read-through', function(done) {
-      promise
-        .then(function() {
-          done(new Error('Not expected to arrive here'));
-        })
-        .catch(function() {
-          done();
-        });
+    it('should still have size of 1', function() {
+      assert.equal( lru.size, 1 );
     });
 
-    describe('key', function() {
+    it('should still have cost of 1', function() {
+      assert.equal( lru.size, 1 );
+    });
 
-      it('should not exist', function() {
-        assert.equal( lru.has('y'), false);
-        assert.equal( lru.get('y'), undefined);
-      });
-
+    it('should not have new key', function() {
+      assert.equal( lru.has('y'), false);
     });
 
   });
