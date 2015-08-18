@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "description": "LRU cache for people who like ES6 and promises",
   "main": "index.js",
+  "engines": {
+    "name": ">= 3.0.0"
+  },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "prepublish": "npm test"
   },
   "author": "Assaf Arkin",
   "license": "MIT",
@@ -24,5 +28,6 @@
     "lru-cache",
     "map",
     "ttl"
-  ]
+  ],
+  "repository": "broadly/caching-map"
 }
