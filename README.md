@@ -1,11 +1,23 @@
 # ES6 LRU cache
 
-* [LRU cache](http://www.cs.uml.edu/~jlu1/doc/codes/lruCache.html)
-* Similar interface to
-  [Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
-* Keys can expire after set time
-* Keys can have different costs
-* Materizlize function to resolve missing keys
+
+This is an in-memory cache for JavaScript objects.  The API is similar to the
+ES6 `Map` class, which is also an in-memory cache for JavaScript objects, but
+you get a few additional features:
+
+* You can set the cache limit to 0 or Infinity, effectively enable/disable
+  caching (e.g. running code in development and production)
+* You can set the cache limit to any value between 0 and Infinity, deciding how
+  much you want to hold in memory
+* You can set the cost for each individual key, for smarter memory usage
+* You can set expiration for each individual key, afterwhich the key is no
+  longer available, making room for new keys
+* Expired keys are evicted first to make room for new keys, followed by least
+  recently used keys
+* You can iterate over all keys from most to least recently used
+* The materialize callback is easy  for caching asynchronous resources
+  (database connections, HTTP resources, etc) while avoiding * Materialize function to avoid [thundering
+  herds](https://en.wikipedia.org/wiki/Thundering_herd_problem)
 
 
 ## Example
@@ -39,159 +51,115 @@ function listDocuments() {
 ```
 
 
-## Step by Step
-
-This LRU cache is designed for caching JavaScript values in local memory.  You
-can use it in circumstances where you can't use an external cache, like memcached,
-specifically if you need to cache complex JavaScript objects, functions,
-sockets.
-
-If you are memory constrained, you can set a limit on the cache size, and it
-will evict old keys to make room for new keys.  Keys can vary in size, so if you
-can calculate the key size, you make better use of available memory.  Keys can
-also have an expiration, and the cache will evict expired keys first to make
-room for new keys.
-
-ES6 has a data structure for caching JavaScript values in local memory, [the Map
-class](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map).
-This cache uses a similar API, and so code that can operate on a `Map` can
-often also use this LRU cache.  However, do note the difference in semantics
-between the two.
-
-
 ### Limit and Cost
 
-When creating a new `LRU` object, the first argument to the constructor is the
-cache limit.
+When creating a new cache, the first constructor argument is the cache limit.
 
-The second argument can be another cache, a `Map` or any iterator that iterates
-over name/value pairs.  You can do `lru = new LRU(limit, map)` just as you can
-do `map = new Map(lru)`.
+The second argument can be another cache, a `Map`, or any iterator that returns
+name/value pairs.  You can easily create a new cache from a map (`new LRU(limit,
+map)`), or turn a cache into a map (`new Map(cache)`).
 
-If you set the cache limit to zero (or a negative number), it will hold zero
-keys.  This could be useful in development, when you want to disable caching,
-but still use the same code:
+If you set the cache limit to zero (or negative number), it will hold zero keys.
+This could be useful when you want to use the same object in different
+configurations, e.g. cache in production but always live load in development.
+
+If you set the cache limit to infinity, it will hold as many keys as you've got.
+This is useful if you want cache features, but don't care about memory usage.
+For example, flipping between caching all or nothing, using TTL to expire old
+values, or tracking most recently used keys:
 
 ```
-const limit = (NODE.ENV === 'production') ? 1000 : 0;
+// Cache keys in production, always live load in development
+// For example, for caching templates
+const limit = (NODE.ENV === 'production') ? Infinity : 0;
 const lru = new LRU(limit);
 ```
 
-If you set the cache limit to infinity, it will hold as many keys as you've got.
-This is useful if you're using TTL to evict expired keys, or you don't care
-about evicting keys, but more interested in tracking their recently used order.
-
-You can use the `limit` property to change the cache limit at any time.  The new
-value will take effect on the next attempt to set a key.
+You can use the `limit` property to change the cache limit at any time.
+Changing the limit doesn't evict any keys until the cache needs to make room for
+new keys.
 
 
 ### Setting Keys
 
-When you `set(key, value)`, that key becomes the most recently used.  If the
-cache runs into that limit, it will first evict expired keys, and then evict
-least recently used keys, until it can make room to store the new key.
+When you set a key, that key becomes the most recently used.
 
-However, if the new key expires immediately, or if bigger than the cache limit,
-it is never stored.
+When you set a key, if the cache runs into its storage limit, it will start
+evicting (deleting) keys until it has room to store the new key.  It will first
+evict any expired keys, and then evict the least recently used keys.
 
-When setting a key, you can associate a cost to that key.  The default is one,
-and so the cache limit will limit how many keys are stored.  However, if you are
-able to assign a variable cost to keys (e.g. the size of a string), then you
-should use that for better memory utilization:
+When setting a key, you can associate a cost for that key.  The default is one,
+so the default behavior is to limit the number of keys stored in the cache:
 
 ```js
-lru.set('x', 'X');
-lru.size
-=> 1
-lru.cost
-=> 1
-lru.set('y', 'YYYYY', { cost: 5 });
+lru.limit = 2;
+lru
+  .set('x', 'XXX')
+  .set('y', 'YYY')
+  .set('z', 'ZZZ');
 lru.size
 => 2
-lru.cost
-=> 6
+[ ...lru.keys() ]
+=> [ 'z', 'y' ]
 ```
 
-When setting a key, you can associate the time to live (in milliseconds),
-afterwhich the key expires.  Expired keys are never retrieved.  In addition,
-expired keys are removed first to make room for new keys:
+However, if you are able to calculate a more accurate cost for each of the keys
+(e.g. the size of a string), you can use that for better memory usage:
 
 ```js
-lru.set('key', 'good for an hour', { ttl: HOUR });
+const x = 'X';
+const y = 'YYYY';
+
+lru.set('x', x, { cost: Buffer.byteLength(x) });
+[ lru.size, lru.cost ]
+=> [ 1, 1 ]
+
+lru.set('y', y, { cost: Buffer.byteLength(y) });
+[ lru.size, lru.cost ]
+=> [ 2, 5 ]
+```
+
+When setting a key, you can associate the time to live (in milliseconds).  Once
+that time has passed, the key is expired.  Expired keys are removed first to
+make room for new keys.  There is no way to retrieve the value of an expired
+key:
+
+```js
+const ttl = ms('1h');
+
+lru.set('key', 'good for an hour', { ttl });
 lru.get('key');
 => 'good for an hour'
 
 setTimeout(function() {
   lru.get('key');
-}, HOUR);
+}, ttl);
 => undefined
 ```
 
+If a key expires immediately (TTL is zero or negative), or if the key cost is
+larger than the limit, then that key is not stored, and no other key is evicted.
 
-### Get / Materialize
 
-When you `get(key)`, that key becomes the most recently used key.  It will be
-the last key removed to make room for new keys.
+### Get
 
-Iterating over the cache, and checking if a key exists (`has(key)`), does not
-affect the recency of the key.  Only getting and setting a key moves changes it
-to most recent.
+When you retrieve a key (`get(key)`), that key becomes the most recently used
+key.  It will be the last key removed to make room for new keys, and the first
+key returned when iterating through the keys.
 
-You can use the materialize function to create keys on the fly.  This function
-will be called when retrieving a key that doesn't exist, and is expected to
-return a value for the key.
-
-If the function returns a promise, the promise is stored in the cache and will
-be available when you retrieve the key again.  However, if the promise rejects,
-it is removed from the cache.  This is useful for storing resources that are
-heavy to materialize, and not always available (e.g. HTTP responses):
-
-```js
-lru.materialize = function(url) {
-  return promisify(request)(url);
-};
-
-const URL = 'http://example.com/';
-
-lru.get(URL).then(
-  function(result) {
-    // The response promise is now cached
-    console.log(result.statusCode);
-
-    assert( lru.has(URL) );
-  },
-  function(error) {
-    // The response promise no longer in the cache, try again
-    assert( !lru.has(URL) );
-  });
-
-```
-
-If you want to also set the cost or TTL for that key:
-
-```js
-lru.materialize = function(url) {
-  const promise = promisify(request)(url);
-
-  promise.then(function(response) {
-
-    const cost = response.body.length;
-    lru.set(url, promise, { cost });
-
-  });
-  return promise;
-};
-```
+In contrast, checking whether a key exists (`has(key)`), or iterating over keys,
+does not change their order.  Only getting or setting a key changes it to most
+recent.
 
 
 ### Iterate
 
 The default iterator, `entries()`, `keys()` and `values()` are all available, as
-well as `forEach`.  They all iterate on entries starting with the most recently
-used key.
+well as `forEach`.  Since this is an LRU cache, they all iterate on entries
+starting with the most recently used key (`Map` uses order of insertion).
 
-Iteration is O(N), but you can use it for operations like deleting all keys that
-match a pattern, listing all keys, and so forth:
+You can use iteration for operations like deleting keys based on a pattern,
+listing all keys, and so forth:
 
 ```js
 function deleteKeysInNamespace(lru, namespace) {
@@ -206,17 +174,18 @@ function listAllKeys(lru) {
 }
 ```
 
+Just watch out, iteration is O(N), and will be expensive for caches with many
+keys.
+
 
 ### Lazy Expiration
 
-Expired keys are only evicted from the cache to either make room for new keys,
-or when you attempt to retrieve them, check their existence, or iterate over
-them.
+Expired keys are lazily evicted from the cache, either to make room for new
+keys, or when attempting to retrieve, check existence or iterate over the
+expired key.
 
-When you read the `size` or `cost` properties, these values may account for
-expired keys.
-
-If you want to force evict all expired keys, you can iterate over all the keys:
+If you want to force evict all expired keys, you need to do so yourself, by
+iterating over all keys:
 
 ```js
 function evictExpiredKeys() {
@@ -224,6 +193,68 @@ function evictExpiredKeys() {
   for (let entry of lru) ;
 }
 
-setTimeout(evictExpiredKeys, 5 * MINUTE);
+setTimeout(evictExpiredKeys, ms('5m'));
+```
+
+Don't forget that whenever you read the `size` or `cost` of the cache, that
+value may include expired keys that are still in the cache but no longer
+accessible.
+
+
+### The Materialize Function
+
+A common pattern for caching code is to retrieve a key, and when the key doesn't
+exist, resolve and store the value.  This easily leads to the [Thundering herd
+problem](https://en.wikipedia.org/wiki/Thundering_herd_problem).
+
+For example, if you have 100 concurrent requests that all need to render the
+same data, but the cache is empty, you may end up with 100 database queries
+attempting to set a single cache key.
+
+The simplest solution is to cache a promise that resolves to that value.  That
+way, everyone is waiting for that one promise to resolve once.  However, if an
+error occurs and the promise is rejected, you want to remove it from the cache,
+so a new promise can take its place.
+
+The materialize function is a convenient way to implement this pattern.  When a
+key has no value, this function is called with the key, and should return the
+expected value, or a promise that resolves to that value.  For example:
+
+```js
+lru.materialize = function(url) {
+  return promisify(request)(url);
+};
+
+const URL = 'http://example.com/';
+
+lru.get(URL).then(
+  function(result) {
+    // We cached a promise that always resolves to this response
+    console.log(result.body);
+
+    assert( lru.has(URL) );
+  },
+  function(error) {
+    // The promise is no longer in the cache, we can try again
+    assert( !lru.has(URL) );
+  });
+
+```
+
+If you want to set the cost and/or expiration for that key, returns a promise,
+but also set the key when that promise resolves:
+
+```js
+lru.materialize = function(url) {
+  const promise = promisify(request)(url);
+
+  promise.then(function(response) {
+
+    const cost = response.body.length;
+    lru.set(url, promise, { cost });
+
+  });
+  return promise;
+};
 ```
 

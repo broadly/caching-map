@@ -51,6 +51,8 @@ class LRU {
       this._cloneLRU(source);
     else if (source)
       this._cloneIterator(source);
+
+    this.materialize = null;
   }
 
   _cloneIterator(source) {
