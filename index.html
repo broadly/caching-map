@@ -28,30 +28,256 @@
         </ul>
       </header>
       <section>
-        <h3>
-<a id="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages" aria-hidden="true"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
+        <h1>
+<a id="lru-cache-for-people-who-like-es6-and-promises" class="anchor" href="#lru-cache-for-people-who-like-es6-and-promises" aria-hidden="true"><span class="octicon octicon-link"></span></a>LRU cache for people who like ES6 and promises</h1>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here <a href="https://guides.github.com/features/mastering-markdown/">using GitHub Flavored Markdown</a>, select a template crafted by a designer, and publish. After your page is generated, you can check out the new <code>gh-pages</code> branch locally. If you’re using GitHub Desktop, simply sync your repository and you’ll see the new branch.</p>
+<p>This is an in-memory cache for JavaScript objects.  The API is similar to the
+ES6 <code>Map</code> class, which is also an in-memory cache for JavaScript objects, but
+you get a few additional features:</p>
+
+<ul>
+<li>You can set the cache limit to 0 or Infinity, effectively enable/disable
+caching (e.g. running code in development and production)</li>
+<li>You can set the cache limit to any value between 0 and Infinity, deciding how
+much you want to hold in memory</li>
+<li>You can set the cost for each individual key, for smarter memory usage</li>
+<li>You can set expiration for each individual key, afterwhich the key is no
+longer available, making room for new keys</li>
+<li>Expired keys are evicted first to make room for new keys, followed by least
+recently used keys</li>
+<li>You can iterate over all keys from most to least recently used</li>
+<li>The materialize callback is easy  for caching asynchronous resources (database
+connections, HTTP resources, etc) while avoiding * Materialize function to
+avoid thundering herds</li>
+</ul>
+
+<h2>
+<a id="example" class="anchor" href="#example" aria-hidden="true"><span class="octicon octicon-link"></span></a>Example</h2>
+
+<div class="highlight highlight-js"><pre><span class="pl-k">const</span> <span class="pl-c1">Cache</span> <span class="pl-k">=</span> <span class="pl-c1">require</span>(<span class="pl-s"><span class="pl-pds">'</span>caching-map<span class="pl-pds">'</span></span>);
+
+<span class="pl-c">// Cache 10 most recently used documents</span>
+<span class="pl-k">const</span> <span class="pl-c1">documents</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">Cache</span>(<span class="pl-c1">10</span>);
+
+<span class="pl-c">// If key is missing, load document from file system</span>
+<span class="pl-c1">documents</span>.<span class="pl-en">materialize</span> <span class="pl-k">=</span> <span class="pl-k">function</span>(<span class="pl-smi">filename</span>) {
+  <span class="pl-k">return</span> <span class="pl-c1">promisify</span>(fs.<span class="pl-c1">readFile</span>)(filename);
+}
+
+
+<span class="pl-c">// filename -&gt; promise(Buffer)</span>
+<span class="pl-c">//</span>
+<span class="pl-c">// Returns promise that resolves to the content of this file</span>
+<span class="pl-c">// File becomes the most recently used</span>
+<span class="pl-k">function</span> <span class="pl-en">loadDocument</span>(<span class="pl-smi">filename</span>) {
+  <span class="pl-k">return</span> documents.<span class="pl-c1">get</span>(filename);
+}
+
+
+<span class="pl-c">// -&gt; [ filename ]</span>
+<span class="pl-c">//</span>
+<span class="pl-c">// Returns up to ten filenames of the most recently loaded documents</span>
+<span class="pl-k">function</span> <span class="pl-en">listDocuments</span>() {
+  <span class="pl-k">const</span> <span class="pl-c1">filenames</span> <span class="pl-k">=</span> [ ...<span class="pl-c1">documents</span>.<span class="pl-c1">keys</span>() ];
+  <span class="pl-k">return</span> filenames;
+}</pre></div>
 
 <h3>
-<a id="designer-templates" class="anchor" href="#designer-templates" aria-hidden="true"><span class="octicon octicon-link"></span></a>Designer Templates</h3>
+<a id="limit-and-cost" class="anchor" href="#limit-and-cost" aria-hidden="true"><span class="octicon octicon-link"></span></a>Limit and Cost</h3>
 
-<p>We’ve crafted some handsome templates for you to use. Go ahead and click 'Continue to layouts' to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved.</p>
+<p>When creating a new cache, the first constructor argument is the cache limit.</p>
+
+<p>The second argument can be another cache, a <code>Map</code>, or any iterator that returns
+name/value pairs.  You can easily create a new cache from a map (<code>new Cache(limit,
+map)</code>), or turn a cache into a map (<code>new Map(cache)</code>).</p>
+
+<p>If you set the cache limit to zero (or negative number), it will hold zero keys.
+This could be useful when you want to use the same object in different
+configurations, e.g. cache in production but always live load in development.</p>
+
+<p>If you set the cache limit to infinity, it will hold as many keys as you've got.
+This is useful if you want cache features, but don't care about memory usage.
+For example, flipping between caching all or nothing, using TTL to expire old
+values, or tracking most recently used keys:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-c">// Cache keys in production, always live load in development</span>
+<span class="pl-c">// For example, for caching templates</span>
+<span class="pl-k">const</span> <span class="pl-c1">limit</span> <span class="pl-k">=</span> (<span class="pl-c1">NODE</span>.<span class="pl-c1">ENV</span> <span class="pl-k">===</span> <span class="pl-s"><span class="pl-pds">'</span>production<span class="pl-pds">'</span></span>) <span class="pl-k">?</span> <span class="pl-c1">Infinity</span> <span class="pl-k">:</span> <span class="pl-c1">0</span>;
+<span class="pl-k">const</span> <span class="pl-c1">cache</span> <span class="pl-k">=</span> <span class="pl-k">new</span> <span class="pl-en">Cache</span>(limit);</pre></div>
+
+<p>You can use the <code>limit</code> property to change the cache limit at any time.
+Changing the limit doesn't evict any keys until the cache needs to make room for
+new keys.</p>
 
 <h3>
-<a id="creating-pages-manually" class="anchor" href="#creating-pages-manually" aria-hidden="true"><span class="octicon octicon-link"></span></a>Creating pages manually</h3>
+<a id="setting-keys" class="anchor" href="#setting-keys" aria-hidden="true"><span class="octicon octicon-link"></span></a>Setting Keys</h3>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<p>When you set a key, that key becomes the most recently used.</p>
+
+<p>When you set a key, if the cache runs into its storage limit, it will start
+evicting (deleting) keys until it has room to store the new key.  It will first
+evict any expired keys, and then evict the least recently used keys.</p>
+
+<p>When setting a key, you can associate a cost for that key.  The default is one,
+so the default behavior is to limit the number of keys stored in the cache:</p>
+
+<div class="highlight highlight-js"><pre>cache.<span class="pl-c1">limit</span> <span class="pl-k">=</span> <span class="pl-c1">2</span>;
+cache
+  .<span class="pl-c1">set</span>(<span class="pl-s"><span class="pl-pds">'</span>x<span class="pl-pds">'</span></span>, <span class="pl-s"><span class="pl-pds">'</span>XXX<span class="pl-pds">'</span></span>)
+  .<span class="pl-c1">set</span>(<span class="pl-s"><span class="pl-pds">'</span>y<span class="pl-pds">'</span></span>, <span class="pl-s"><span class="pl-pds">'</span>YYY<span class="pl-pds">'</span></span>)
+  .<span class="pl-c1">set</span>(<span class="pl-s"><span class="pl-pds">'</span>z<span class="pl-pds">'</span></span>, <span class="pl-s"><span class="pl-pds">'</span>ZZZ<span class="pl-pds">'</span></span>);
+cache.<span class="pl-c1">size</span>
+<span class="pl-k">=&gt;</span> <span class="pl-c1">2</span>
+[ ...<span class="pl-c1">cache</span>.<span class="pl-c1">keys</span>() ]
+<span class="pl-k">=&gt;</span> [ <span class="pl-s"><span class="pl-pds">'</span>z<span class="pl-pds">'</span></span>, <span class="pl-s"><span class="pl-pds">'</span>y<span class="pl-pds">'</span></span> ]</pre></div>
+
+<p>However, if you are able to calculate a more accurate cost for each of the keys
+(e.g. the size of a string), you can use that for better memory usage:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-k">const</span> <span class="pl-c1">x</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>X<span class="pl-pds">'</span></span>;
+<span class="pl-k">const</span> <span class="pl-c1">y</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>YYYY<span class="pl-pds">'</span></span>;
+
+cache.<span class="pl-c1">set</span>(<span class="pl-s"><span class="pl-pds">'</span>x<span class="pl-pds">'</span></span>, x, { cost<span class="pl-k">:</span> Buffer.<span class="pl-c1">byteLength</span>(x) });
+[ cache.<span class="pl-c1">size</span>, cache.<span class="pl-c1">cost</span> ]
+<span class="pl-k">=&gt;</span> [ <span class="pl-c1">1</span>, <span class="pl-c1">1</span> ]
+
+cache.<span class="pl-c1">set</span>(<span class="pl-s"><span class="pl-pds">'</span>y<span class="pl-pds">'</span></span>, y, { cost<span class="pl-k">:</span> Buffer.<span class="pl-c1">byteLength</span>(y) });
+[ cache.<span class="pl-c1">size</span>, cache.<span class="pl-c1">cost</span> ]
+<span class="pl-k">=&gt;</span> [ <span class="pl-c1">2</span>, <span class="pl-c1">5</span> ]</pre></div>
+
+<p>When setting a key, you can associate the time to live (in milliseconds).  Once
+that time has passed, the key is expired.  Expired keys are removed first to
+make room for new keys.  There is no way to retrieve the value of an expired
+key:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-k">const</span> <span class="pl-c1">ttl</span> <span class="pl-k">=</span> <span class="pl-c1">ms</span>(<span class="pl-s"><span class="pl-pds">'</span>1h<span class="pl-pds">'</span></span>);
+
+cache.<span class="pl-c1">set</span>(<span class="pl-s"><span class="pl-pds">'</span>key<span class="pl-pds">'</span></span>, <span class="pl-s"><span class="pl-pds">'</span>good for an hour<span class="pl-pds">'</span></span>, { ttl });
+cache.<span class="pl-c1">get</span>(<span class="pl-s"><span class="pl-pds">'</span>key<span class="pl-pds">'</span></span>);
+<span class="pl-k">=&gt;</span> <span class="pl-s"><span class="pl-pds">'</span>good for an hour<span class="pl-pds">'</span></span>
+
+<span class="pl-c1">setTimeout</span>(<span class="pl-k">function</span>() {
+  cache.<span class="pl-c1">get</span>(<span class="pl-s"><span class="pl-pds">'</span>key<span class="pl-pds">'</span></span>);
+}, ttl);
+<span class="pl-k">=&gt;</span> <span class="pl-c1">undefined</span></pre></div>
+
+<p>If a key expires immediately (TTL is zero or negative), or if the key cost is
+larger than the limit, then that key is not stored, and no other key is evicted.</p>
 
 <h3>
-<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+<a id="get" class="anchor" href="#get" aria-hidden="true"><span class="octicon octicon-link"></span></a>Get</h3>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor’s GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+<p>When you retrieve a key (<code>get(key)</code>), that key becomes the most recently used
+key.  It will be the last key removed to make room for new keys, and the first
+key returned when iterating through the keys.</p>
+
+<p>In contrast, checking whether a key exists (<code>has(key)</code>), or iterating over keys,
+does not change their order.  Only getting or setting a key changes it to most
+recent.</p>
 
 <h3>
-<a id="support-or-contact" class="anchor" href="#support-or-contact" aria-hidden="true"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
+<a id="iterate" class="anchor" href="#iterate" aria-hidden="true"><span class="octicon octicon-link"></span></a>Iterate</h3>
 
-<p>Having trouble with Pages? Check out our <a href="https://help.github.com/pages">documentation</a> or <a href="https://github.com/contact">contact support</a> and we’ll help you sort it out.</p>
+<p>The default iterator, <code>entries()</code>, <code>keys()</code> and <code>values()</code> are all available, as
+well as <code>forEach</code>.  Since this is an LRU cache, they all iterate on entries
+based on their caching order: from most to least recently used.</p>
+
+<p>You can use iteration for operations like deleting keys based on a pattern,
+listing all keys, and so forth:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-k">function</span> <span class="pl-en">deleteKeysInNamespace</span>(<span class="pl-smi">cache</span>, <span class="pl-smi">namespace</span>) {
+  <span class="pl-k">const</span> <span class="pl-c1">prefix</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">`</span><span class="pl-s1"><span class="pl-pse">${</span>namespace<span class="pl-pse">}</span></span>:<span class="pl-pds">`</span></span>;
+  <span class="pl-k">for</span> (<span class="pl-k">let</span> key <span class="pl-k">of</span> cache)
+    <span class="pl-k">if</span> (key.<span class="pl-c1">startsWith</span>(prefix))
+      cache.<span class="pl-c1">delete</span>(key);
+}
+
+<span class="pl-k">function</span> <span class="pl-en">listAllKeys</span>(<span class="pl-smi">cache</span>) {
+  <span class="pl-k">return</span> [ ...<span class="pl-c1">cache</span>.<span class="pl-c1">keys</span>() ];
+}</pre></div>
+
+<p>Just watch out, iteration is O(N), and will be expensive for caches with many
+keys.</p>
+
+<h3>
+<a id="lazy-expiration" class="anchor" href="#lazy-expiration" aria-hidden="true"><span class="octicon octicon-link"></span></a>Lazy Expiration</h3>
+
+<p>Expired keys are lazily evicted from the cache, either to make room for new
+keys, or when attempting to retrieve, check existence or iterate over the
+expired key.</p>
+
+<p>If you want to force evict all expired keys, you need to do so yourself, by
+iterating over all keys:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-k">function</span> <span class="pl-en">evictExpiredKeys</span>() {
+  <span class="pl-c">// Iterating over expired key removes it from the cache</span>
+  <span class="pl-k">for</span> (<span class="pl-k">let</span> entry <span class="pl-k">of</span> cache) ;
+}
+
+<span class="pl-c1">setTimeout</span>(evictExpiredKeys, <span class="pl-c1">ms</span>(<span class="pl-s"><span class="pl-pds">'</span>5m<span class="pl-pds">'</span></span>));</pre></div>
+
+<p>Don't forget that whenever you read the <code>size</code> or <code>cost</code> of the cache, that
+value may include expired keys that are still in the cache but no longer
+accessible.</p>
+
+<h3>
+<a id="the-materialize-function" class="anchor" href="#the-materialize-function" aria-hidden="true"><span class="octicon octicon-link"></span></a>The Materialize Function</h3>
+
+<p>A common pattern for caching code is to retrieve a key, and when the key doesn't
+exist, resolve and store the value.  This easily leads to the <a href="https://en.wikipedia.org/wiki/Thundering_herd_problem">Thundering herd
+problem</a>.</p>
+
+<p>For example, if you have 100 concurrent requests that all need to render the
+same data, but the cache is empty, you may end up with 100 database queries
+attempting to set a single cache key.</p>
+
+<p>The simplest solution is to cache a promise that resolves to that value.  That
+way, everyone is waiting for that one promise to resolve once.  However, if an
+error occurs and the promise is rejected, you want to remove it from the cache,
+so a new promise can take its place.</p>
+
+<p>The materialize function is a convenient way to implement this pattern.  When a
+key has no value, this function is called with the key, and should return the
+expected value, or a promise that resolves to that value.  For example:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-c1">cache</span>.<span class="pl-en">materialize</span> <span class="pl-k">=</span> <span class="pl-k">function</span>(<span class="pl-smi">url</span>) {
+  <span class="pl-k">return</span> <span class="pl-c1">promisify</span>(request)(url);
+};
+
+<span class="pl-k">const</span> <span class="pl-c1">URL</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">'</span>http://example.com/<span class="pl-pds">'</span></span>;
+
+cache.<span class="pl-c1">get</span>(<span class="pl-c1">URL</span>).<span class="pl-c1">then</span>(
+  <span class="pl-k">function</span>(<span class="pl-smi">result</span>) {
+    <span class="pl-c">// We cached a promise that always resolves to this response</span>
+    <span class="pl-en">console</span><span class="pl-c1">.log</span>(result.<span class="pl-c1">body</span>);
+
+    <span class="pl-c1">assert</span>( cache.<span class="pl-c1">has</span>(<span class="pl-c1">URL</span>) );
+  },
+  <span class="pl-k">function</span>(<span class="pl-smi">error</span>) {
+    <span class="pl-c">// The promise is no longer in the cache, we can try again</span>
+    <span class="pl-c1">assert</span>( <span class="pl-k">!</span>cache.<span class="pl-c1">has</span>(<span class="pl-c1">URL</span>) );
+  });
+</pre></div>
+
+<p>If you want to set the cost and/or expiration for that key, returns a promise,
+but also set the key when that promise resolves:</p>
+
+<div class="highlight highlight-js"><pre><span class="pl-c1">cache</span>.<span class="pl-en">materialize</span> <span class="pl-k">=</span> <span class="pl-k">function</span>(<span class="pl-smi">url</span>) {
+  <span class="pl-k">const</span> <span class="pl-c1">promise</span> <span class="pl-k">=</span> <span class="pl-c1">promisify</span>(request)(url);
+
+  promise.<span class="pl-c1">then</span>(<span class="pl-k">function</span>(<span class="pl-smi">response</span>) {
+
+    <span class="pl-k">const</span> <span class="pl-c1">cost</span> <span class="pl-k">=</span> response.<span class="pl-c1">body</span>.<span class="pl-c1">length</span>;
+    cache.<span class="pl-c1">set</span>(url, promise, { cost });
+
+  });
+  <span class="pl-k">return</span> promise;
+};</pre></div>
+
+<h2>
+<a id="license" class="anchor" href="#license" aria-hidden="true"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>MIT License Copyright (c) 2015 Broadly Inc</p>
       </section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/broadly">broadly</a></p>
