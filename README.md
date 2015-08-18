@@ -14,9 +14,9 @@ you get a few additional features:
 * Expired keys are evicted first to make room for new keys, followed by least
   recently used keys
 * You can iterate over all keys from most to least recently used
-* The materialize callback is easy  for caching asynchronous resources
-  (database connections, HTTP resources, etc) while avoiding * Materialize function to avoid [thundering
-  herds](https://en.wikipedia.org/wiki/Thundering_herd_problem)
+* The materialize callback is easy  for caching asynchronous resources (database
+  connections, HTTP resources, etc) while avoiding * Materialize function to
+  avoid thundering herds
 
 
 ## Example
@@ -259,3 +259,7 @@ cache.materialize = function(url) {
 };
 ```
 
+
+## License
+
+MIT License Copyright (c) 2015 Broadly Inc
