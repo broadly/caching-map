@@ -13,5 +13,16 @@
   },
   "dependencies": {
     "lodash": "^3.10.0"
-  }
+  },
+  "keywords": [
+    "cache",
+    "caching",
+    "es2015",
+    "es6",
+    "in-memory",
+    "lru",
+    "lru-cache",
+    "map",
+    "ttl"
+  ]
 }
