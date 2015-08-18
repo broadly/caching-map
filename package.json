@@ -1,5 +1,5 @@
 {
-  "name": "lru-map",
+  "name": "caching-map",
   "version": "1.0.0",
   "description": "LRU cache for people who like ES6 and promises",
   "main": "index.js",

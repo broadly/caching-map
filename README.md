@@ -1,5 +1,4 @@
-# ES6 LRU cache
-
+# LRU cache for people who like ES6 and promises
 
 This is an in-memory cache for JavaScript objects.  The API is similar to the
 ES6 `Map` class, which is also an in-memory cache for JavaScript objects, but
@@ -23,8 +22,10 @@ you get a few additional features:
 ## Example
 
 ```js
+const Cache = require('caching-map');
+
 // Cache 10 most recently used documents
-const documents = new LRU(10);
+const documents = new Cache(10);
 
 // If key is missing, load document from file system
 documents.materialize = function(filename) {
@@ -36,8 +37,8 @@ documents.materialize = function(filename) {
 //
 // Returns promise that resolves to the content of this file
 // File becomes the most recently used
-function loadDocument(path) {
-  return documents.get(path);
+function loadDocument(filename) {
+  return documents.get(filename);
 }
 
 
@@ -56,7 +57,7 @@ function listDocuments() {
 When creating a new cache, the first constructor argument is the cache limit.
 
 The second argument can be another cache, a `Map`, or any iterator that returns
-name/value pairs.  You can easily create a new cache from a map (`new LRU(limit,
+name/value pairs.  You can easily create a new cache from a map (`new Cache(limit,
 map)`), or turn a cache into a map (`new Map(cache)`).
 
 If you set the cache limit to zero (or negative number), it will hold zero keys.
@@ -68,11 +69,11 @@ This is useful if you want cache features, but don't care about memory usage.
 For example, flipping between caching all or nothing, using TTL to expire old
 values, or tracking most recently used keys:
 
-```
+```js
 // Cache keys in production, always live load in development
 // For example, for caching templates
 const limit = (NODE.ENV === 'production') ? Infinity : 0;
-const lru = new LRU(limit);
+const cache = new Cache(limit);
 ```
 
 You can use the `limit` property to change the cache limit at any time.
@@ -92,14 +93,14 @@ When setting a key, you can associate a cost for that key.  The default is one,
 so the default behavior is to limit the number of keys stored in the cache:
 
 ```js
-lru.limit = 2;
-lru
+cache.limit = 2;
+cache
   .set('x', 'XXX')
   .set('y', 'YYY')
   .set('z', 'ZZZ');
-lru.size
+cache.size
 => 2
-[ ...lru.keys() ]
+[ ...cache.keys() ]
 => [ 'z', 'y' ]
 ```
 
@@ -110,12 +111,12 @@ However, if you are able to calculate a more accurate cost for each of the keys
 const x = 'X';
 const y = 'YYYY';
 
-lru.set('x', x, { cost: Buffer.byteLength(x) });
-[ lru.size, lru.cost ]
+cache.set('x', x, { cost: Buffer.byteLength(x) });
+[ cache.size, cache.cost ]
 => [ 1, 1 ]
 
-lru.set('y', y, { cost: Buffer.byteLength(y) });
-[ lru.size, lru.cost ]
+cache.set('y', y, { cost: Buffer.byteLength(y) });
+[ cache.size, cache.cost ]
 => [ 2, 5 ]
 ```
 
@@ -127,12 +128,12 @@ key:
 ```js
 const ttl = ms('1h');
 
-lru.set('key', 'good for an hour', { ttl });
-lru.get('key');
+cache.set('key', 'good for an hour', { ttl });
+cache.get('key');
 => 'good for an hour'
 
 setTimeout(function() {
-  lru.get('key');
+  cache.get('key');
 }, ttl);
 => undefined
 ```
@@ -156,21 +157,21 @@ recent.
 
 The default iterator, `entries()`, `keys()` and `values()` are all available, as
 well as `forEach`.  Since this is an LRU cache, they all iterate on entries
-starting with the most recently used key (`Map` uses order of insertion).
+based on their caching order: from most to least recently used.
 
 You can use iteration for operations like deleting keys based on a pattern,
 listing all keys, and so forth:
 
 ```js
-function deleteKeysInNamespace(lru, namespace) {
+function deleteKeysInNamespace(cache, namespace) {
   const prefix = `${namespace}:`;
-  for (let key of lru)
+  for (let key of cache)
     if (key.startsWith(prefix))
-      lru.delete(key);
+      cache.delete(key);
 }
 
-function listAllKeys(lru) {
-  return [ ...lru.keys() ];
+function listAllKeys(cache) {
+  return [ ...cache.keys() ];
 }
 ```
 
@@ -190,7 +191,7 @@ iterating over all keys:
 ```js
 function evictExpiredKeys() {
   // Iterating over expired key removes it from the cache
-  for (let entry of lru) ;
+  for (let entry of cache) ;
 }
 
 setTimeout(evictExpiredKeys, ms('5m'));
@@ -221,22 +222,22 @@ key has no value, this function is called with the key, and should return the
 expected value, or a promise that resolves to that value.  For example:
 
 ```js
-lru.materialize = function(url) {
+cache.materialize = function(url) {
   return promisify(request)(url);
 };
 
 const URL = 'http://example.com/';
 
-lru.get(URL).then(
+cache.get(URL).then(
   function(result) {
     // We cached a promise that always resolves to this response
     console.log(result.body);
 
-    assert( lru.has(URL) );
+    assert( cache.has(URL) );
   },
   function(error) {
     // The promise is no longer in the cache, we can try again
-    assert( !lru.has(URL) );
+    assert( !cache.has(URL) );
   });
 
 ```
@@ -245,13 +246,13 @@ If you want to set the cost and/or expiration for that key, returns a promise,
 but also set the key when that promise resolves:
 
 ```js
-lru.materialize = function(url) {
+cache.materialize = function(url) {
   const promise = promisify(request)(url);
 
   promise.then(function(response) {
 
     const cost = response.body.length;
-    lru.set(url, promise, { cost });
+    cache.set(url, promise, { cost });
 
   });
   return promise;

@@ -1,4 +1,4 @@
-// LRU cache based on ES6 Map
+// LRU cache for people who like ES6 and promises
 
 'use strict';
 const Util = require('util');
@@ -26,7 +26,7 @@ function hasExpired(link) {
 }
 
 
-// 1. We don't want these properties to show up in console.log(lru)
+// 1. We don't want these properties to show up in console.log(cache)
 // 2. Private methods could come here, when io.js supports them
 const _cost   = Symbol('cost');
 const _head   = Symbol('head');
@@ -35,7 +35,7 @@ const _limit  = Symbol('limit');
 const _map    = Symbol('map');
 
 
-class LRU {
+class Cache {
 
   constructor(limit, source) {
     this[_map]  = new Map();
@@ -43,13 +43,13 @@ class LRU {
 
     if (limit && limit[Symbol.iterator]) {
       source = limit;
-      limit  = (source instanceof LRU) ? source.limit : undefined;
+      limit  = (source instanceof Cache) ? source.limit : undefined;
     }
     this.limit = limit;
     this.materialize = null;
 
-    if (source instanceof LRU)
-      this._cloneLRU(source);
+    if (source instanceof Cache)
+      this._cloneCache(source);
     else if (source)
       this._cloneIterator(source);
   }
@@ -59,7 +59,7 @@ class LRU {
       this.set(entry[0], entry[1]);
   }
 
-  _cloneLRU(source) {
+  _cloneCache(source) {
     let link = source[_tail];
     while (link) {
       this.set(link.key, link.value, link);
@@ -218,7 +218,6 @@ class LRU {
   }
 
 
-  // The LRU iterators go from most to least recent
   *entries() {
     let link = this[_head];
     while (link) {
@@ -298,9 +297,9 @@ class LRU {
       expires,
 
       inspect(depth, inspectOptions) {
-        // console.log(lru) calls inspect(lru) on the Map, which ends up
-        // calling inspect on each map value (this LRU key).  We want to show
-        // the stored value (just like a Map).
+        // console.log(cache) calls inspect(cache) on the Map, which ends up
+        // calling inspect on each map value (i.e. this link object).  We want
+        // to show the stored value (just like a Map).
         return Util.inspect(value, inspectOptions);
       }
     };
@@ -314,7 +313,7 @@ class LRU {
   }
 
 
-  // Util.inspect(lru) calls this, and Node's console.log uses inspect
+  // Util.inspect(cache) calls this, and Node's console.log uses inspect
   inspect(depth, inspectOptions) {
     return Util.inspect(this[_map], inspectOptions);
   }
@@ -323,8 +322,8 @@ class LRU {
 
 
 // Just like Map, the default iterator iterates over all entries (except our order is different)
-LRU.prototype[Symbol.iterator] = LRU.prototype.entries;
+Cache.prototype[Symbol.iterator] = Cache.prototype.entries;
 
 
-module.exports = LRU;
+module.exports = Cache;
 
