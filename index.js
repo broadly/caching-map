@@ -46,13 +46,12 @@ class LRU {
       limit  = (source instanceof LRU) ? source.limit : undefined;
     }
     this.limit = limit;
+    this.materialize = null;
 
     if (source instanceof LRU)
       this._cloneLRU(source);
     else if (source)
       this._cloneIterator(source);
-
-    this.materialize = null;
   }
 
   _cloneIterator(source) {
@@ -66,6 +65,7 @@ class LRU {
       this.set(link.key, link.value, link);
       link = link.previous;
     }
+    this.materialize = source.materialize;
   }
 
 

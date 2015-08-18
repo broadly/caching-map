@@ -15,7 +15,11 @@ function arrayFrom(iterator) {
 
 describe('LRU with limit of zero', function() {
 
-  const lru = new LRU(0);
+  let lru;
+
+  before(function() {
+    lru = new LRU(0);
+  });
 
   it('should report a limit of zero', function() {
     assert.equal(lru.limit, 0);
@@ -61,7 +65,12 @@ describe('LRU with limit of zero', function() {
 
 
 describe('LRU with negative limit', function() {
-  const lru = new LRU(-10);
+
+  let lru;
+
+  before(function() {
+    lru = new LRU(-10);
+  });
 
   it('should report a limit of zero', function() {
     assert.equal(lru.limit, 0);
@@ -80,9 +89,10 @@ describe('LRU with negative limit', function() {
 
 describe('LRU with three keys', function() {
 
-  const lru = new LRU();
+  let lru;
 
   before(function() {
+    lru = new LRU();
     lru
       .set('x', 'XXX')
       .set('y', 'YYY')
@@ -343,7 +353,11 @@ describe('LRU with three keys', function() {
 
 describe('LRU with limit of five', function() {
 
-  const lru = new LRU(5);
+  let lru;
+
+  before(function() {
+    lru = new LRU(5);
+  });
 
   it('should report a limit of five', function() {
     assert.equal(lru.limit, 5);
@@ -480,7 +494,11 @@ describe('LRU with limit of five', function() {
 
 describe('LRU with no limit', function() {
 
-  const lru = new LRU();
+  let lru;
+
+  before(function() {
+    lru = new LRU();
+  });
 
   it('should report a limit of Infinity', function() {
     assert.equal(lru.limit, Infinity);
@@ -520,12 +538,14 @@ describe('LRU with no limit', function() {
 
 describe('Iterate and delete', function() {
 
-  const lru   = new LRU();
-  const keys  = [];
+  let lru;
+  let keys;
 
   before(function() {
+    lru   = new LRU();
     lru.set('x').set('y').set('z');
 
+    keys  = [];
     for (let key of lru.keys()) {
       keys.push(key);
       lru.delete(key);
@@ -554,9 +574,10 @@ describe('Iterate and delete', function() {
 
 describe('LRU with expiring entries', function() {
 
-  const lru = new LRU(4);
+  let lru;
 
   before(function() {
+    lru = new LRU(4);
     // `a` expires immediately, never gets stored
     lru
       .set('a', 1, { ttl: 0 })
@@ -680,8 +701,13 @@ describe('LRU with expiring entries', function() {
 
 describe('Clone Map', function() {
 
-  const map     = new Map([ [ 'a', 1 ], [ 'b', 2 ] ]);
-  const fromMap = new LRU(2, map);
+  let fromMap;
+
+  before(function() {
+    const map   = new Map([ [ 'a', 1 ], [ 'b', 2 ] ]);
+    fromMap     = new LRU(2, map);
+    fromMap.materialize = function() {};
+  });
 
   it('should have the same keys as the source, but most to least recent', function() {
     const keys = arrayFrom( fromMap.keys() );
@@ -704,7 +730,11 @@ describe('Clone Map', function() {
 
   describe('Clone cache', function() {
 
-    const fromCache = new LRU(fromMap);
+    let fromCache;
+
+    before(function() {
+      fromCache = new LRU(fromMap);
+    });
 
     it('should have the same limit as the source', function() {
       assert.equal(fromCache.limit, 2);
@@ -728,6 +758,9 @@ describe('Clone Map', function() {
       assert.equal(fromCache.cost, 2);
     });
 
+    it('should have same materialize function', function() {
+      assert.equal(fromCache.materialize, fromMap.materialize);
+    });
   });
 
 });
@@ -735,10 +768,11 @@ describe('Clone Map', function() {
 
 describe('With materialize function', function() {
 
-  const lru = new LRU();
+  let lru;
   let resolved;
 
   before(function() {
+    lru = new LRU();
     lru.materialize = function(key) {
       const upper = key.toUpperCase();
       return `${upper}${upper}${upper}`;
