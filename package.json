@@ -15,9 +15,6 @@
   "devDependencies": {
     "mocha": "^2.2.5"
   },
-  "dependencies": {
-    "lodash": "^3.10.0"
-  },
   "keywords": [
     "cache",
     "caching",
