@@ -26,5 +26,9 @@
     "map",
     "ttl"
   ],
+  "files": [
+      "LICENSE",
+      "index.js"
+  ],
   "repository": "broadly/caching-map"
 }
