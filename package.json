@@ -27,8 +27,9 @@
     "ttl"
   ],
   "files": [
-      "LICENSE",
-      "index.js"
+    "index.js",
+    "LICENSE",
+    "README.md"
   ],
   "repository": "broadly/caching-map"
 }
